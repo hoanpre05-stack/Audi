@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="vi" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LyricStudio AI - Video Maker & Kinetic Typography</title>
+    <meta name="description" content="Tự động phân tích audio, nhận diện lời bài hát và thiết kế lyric video chuyên nghiệp với hiệu ứng chuyển động nhịp điệu và font chữ nghệ thuật bắt mắt." />
+    <meta property="og:title" content="LyricStudio AI - Video Maker & Kinetic Typography" />
+    <meta property="og:description" content="Tự động phân tích audio, nhận diện lời bài hát và thiết kế lyric video chuyên nghiệp với hiệu ứng chuyển động nhịp điệu và font chữ nghệ thuật bắt mắt." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Bebas+Neue&family=Caveat:wght@600;700&family=Cinzel:wght@600;800;900&family=Dancing+Script:wght@700&family=JetBrains+Mono:wght@400;500;700&family=Lobster&family=Montserrat:ital,wght@0,400;0,700;0,900;1,700&family=Orbitron:wght@600;800;900&family=Pacifico&family=Playfair+Display:ital,wght@0,600;0,800;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Righteous&family=Space+Grotesk:wght@500;700&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+    <script>
+      // In AI Studio preview iframe, Vite HMR WebSocket is disabled
+      window.addEventListener('unhandledrejection', function(event) {
+        var msg = String(event.reason && (event.reason.message || event.reason) || '');
+        if (msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1 || msg.indexOf('vite') !== -1) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', function(event) {
+        var msg = String(event.message || '');
+        if (msg.indexOf('WebSocket') !== -1 || msg.indexOf('websocket') !== -1 || msg.indexOf('vite') !== -1) {
+          event.preventDefault();
+        }
+      });
+    </script>
+  </head>
+  <body class="bg-zinc-950 text-zinc-100 antialiased selection:bg-rose-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

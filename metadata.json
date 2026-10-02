@@ -1,0 +1,6 @@
+{
+  "name": "LyricStudio AI - Video Maker & Kinetic Typography",
+  "description": "Tự động phân tích audio, nhận diện lời bài hát và thiết kế lyric video chuyên nghiệp với hiệu ứng chuyển động nhịp điệu và font chữ nghệ thuật bắt mắt.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
