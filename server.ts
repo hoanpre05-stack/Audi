@@ -6,6 +6,9 @@ import os from 'os';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { consumeAiCredit } from './src/server/guard';
+import { mountApiRoutes } from './src/server/routes/api';
+import { mountPayosRoutes } from './src/server/routes/payosApi';
 import { loadSiteConfig } from './src/server/siteConfig';
 import {
   renderAdsTxt,
@@ -52,6 +55,9 @@ const getGeminiClient = () => {
 // API: Transcribe audio & synchronize lyrics with timestamps
 app.post('/api/transcribe-lyrics', async (req, res) => {
   try {
+    const gate = await consumeAiCredit(req);
+    if (!gate.ok) return res.status(gate.status).json(gate.body);
+
     const {
       audioBase64,
       mimeType = 'audio/mp3',
@@ -486,6 +492,9 @@ Return JSON strictly in this structure:
 // API: Generate lyric lines or smart rhythm adjustments
 app.post('/api/ai-lyric-assistant', async (req, res) => {
   try {
+    const gate = await consumeAiCredit(req);
+    if (!gate.ok) return res.status(gate.status).json(gate.body);
+
     const { action, topic, genre, lyrics, audioDuration } = req.body;
     const ai = getGeminiClient();
 
@@ -551,6 +560,9 @@ Output JSON:
 // API: Dedicated Waveform Forced Alignment (Căn Khớp Sóng Âm) using gemini-3.5-flash-lite
 app.post('/api/forced-align', async (req, res) => {
   try {
+    const gate = await consumeAiCredit(req);
+    if (!gate.ok) return res.status(gate.status).json(gate.body);
+
     const { audioBase64, mimeType = 'audio/mp3', lyricsLines, audioDuration = 30 } = req.body;
     if (!lyricsLines || !Array.isArray(lyricsLines) || lyricsLines.length === 0) {
       return res.status(400).json({ error: 'Vui lòng cung cấp danh sách lời bài hát để căn khớp sóng âm.' });
@@ -678,6 +690,9 @@ FORCED ALIGNMENT RULES:
 // API: Autonomous AI Creative Video Director & Motion Graphic Designer
 app.post('/api/ai-design-video', async (req, res) => {
   try {
+    const gate = await consumeAiCredit(req);
+    if (!gate.ok) return res.status(gate.status).json(gate.body);
+
     const {
       songTitle,
       artist,
@@ -914,20 +929,49 @@ Return ONLY valid JSON matching this schema:
 });
 
 // API: High-speed conversion to MP4 (H.264 + AAC + faststart) using system FFmpeg
+/**
+ * FFmpeg conversion is CPU-bound, so unlimited concurrency is the easiest way to
+ * make the whole container unresponsive. Cap in-flight conversions per IP and
+ * let extra callers retry instead.
+ */
+const inFlightConverts = new Map<string, number>();
+const MAX_CONVERT_PER_IP = 2;
+
+const acquireConvertSlot = (key: string): boolean => {
+  const current = inFlightConverts.get(key) ?? 0;
+  if (current >= MAX_CONVERT_PER_IP) return false;
+  inFlightConverts.set(key, current + 1);
+  return true;
+};
+
+const releaseConvertSlot = (key: string): void => {
+  const current = inFlightConverts.get(key) ?? 1;
+  if (current <= 1) inFlightConverts.delete(key);
+  else inFlightConverts.set(key, current - 1);
+};
+
 app.post(
   '/api/convert-to-mp4',
   express.raw({ type: '*/*', limit: '300mb' }),
   async (req, res) => {
+    const convertKey = req.ip || req.socket.remoteAddress || 'unknown';
+    if (!acquireConvertSlot(convertKey)) {
+      return res.status(429).json({
+        code: 'CONVERT_BUSY',
+        message: 'Máy chủ đang bận xử lý các video khác. Vui lòng thử lại sau giây lát.',
+      });
+    }
+
+    const tmpDir = os.tmpdir();
+    const id = Date.now() + '-' + Math.random().toString(36).substring(2, 8);
+    const inputPath = path.join(tmpDir, `input-${id}.webm`);
+    const outputPath = path.join(tmpDir, `output-${id}.mp4`);
+
     try {
       const inputBuffer = req.body;
       if (!inputBuffer || !Buffer.isBuffer(inputBuffer) || inputBuffer.length === 0) {
         return res.status(400).json({ error: 'Không nhận được dữ liệu video hợp lệ để chuyển đổi.' });
       }
-
-      const tmpDir = os.tmpdir();
-      const id = Date.now() + '-' + Math.random().toString(36).substring(2, 8);
-      const inputPath = path.join(tmpDir, `input-${id}.webm`);
-      const outputPath = path.join(tmpDir, `output-${id}.mp4`);
 
       await fs.promises.writeFile(inputPath, inputBuffer);
 
@@ -975,10 +1019,6 @@ app.post(
 
       const outputBuffer = await fs.promises.readFile(outputPath);
 
-      // Clean up temporary files
-      fs.promises.unlink(inputPath).catch(() => {});
-      fs.promises.unlink(outputPath).catch(() => {});
-
       res.setHeader('Content-Type', 'video/mp4');
       res.setHeader('Content-Length', outputBuffer.length);
       res.setHeader('Content-Disposition', 'attachment; filename="lyric-video.mp4"');
@@ -986,6 +1026,12 @@ app.post(
     } catch (err: any) {
       console.error('MP4 conversion endpoint error:', err);
       return res.status(500).json({ error: err?.message || 'Lỗi khi chuyển đổi định dạng MP4' });
+    } finally {
+      // Always clean up. An early return above would otherwise leave multi-hundred-megabyte
+      // temp files behind until the container restarts.
+      fs.promises.unlink(inputPath).catch(() => {});
+      fs.promises.unlink(outputPath).catch(() => {});
+      releaseConvertSlot(convertKey);
     }
   }
 );
@@ -994,6 +1040,10 @@ const siteCfg = loadSiteConfig();
 
 const sendHtml = (res: express.Response, html: string, status = 200) =>
   res.status(status).type('html').send(html);
+
+// --- Account + purchase APIs (registered before the SEO/HTML routes) ---
+mountApiRoutes(app);
+mountPayosRoutes(app, siteCfg);
 
 // --- SEO / monetization files (must precede static serving) ---
 app.get('/ads.txt', (_req, res) => {
