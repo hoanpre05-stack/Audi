@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { LyricLine, ProjectData, WordTiming } from '../types';
+import { ApiError, aiRequest } from '../utils/api';
 import {
   X,
   Play,
@@ -534,18 +535,12 @@ export const ForcedAlignmentModal: React.FC<ForcedAlignmentModalProps> = ({
         });
       }
 
-      const alignRes = await fetch('/api/forced-align', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          audioBase64,
-          mimeType: 'audio/mp3',
-          lyricsLines: lyrics,
-          audioDuration: project.audioDuration || 30,
-        }),
+      const data = await aiRequest('/api/forced-align', {
+        audioBase64,
+        mimeType: 'audio/mp3',
+        lyricsLines: lyrics,
+        audioDuration: project.audioDuration || 30,
       });
-
-      const data = await alignRes.json();
 
       if (data.success && Array.isArray(data.lines) && data.lines.length > 0) {
         setLyrics(data.lines);
@@ -555,7 +550,13 @@ export const ForcedAlignmentModal: React.FC<ForcedAlignmentModalProps> = ({
       }
     } catch (err: any) {
       console.error('Error running forced alignment:', err);
-      setStatusMessage('Lỗi khi căn khớp sóng âm, đã dùng dự phòng.');
+      // Out of quota is not a transient failure: telling the user it "fell back"
+      // would hide why nothing actually happened.
+      if (err instanceof ApiError && err.isQuota) {
+        setStatusMessage(err.message);
+      } else {
+        setStatusMessage('Lỗi khi căn khớp sóng âm, đã dùng dự phòng.');
+      }
     } finally {
       setIsAligning(false);
     }

@@ -38,6 +38,12 @@ export interface MeState {
   proUntil: string | null;
   aiUsedToday: number;
   aiLimit: number;
+  /**
+   * False when the server cannot attribute usage (Supabase or IP_HASH_SALT is
+   * unset). AI calls will be refused in that state, so the UI must not claim the
+   * user is out of credits.
+   */
+  quotaAvailable?: boolean;
 }
 
 export const EMPTY_ME: MeState = {
@@ -49,6 +55,7 @@ export const EMPTY_ME: MeState = {
   proUntil: null,
   aiUsedToday: 0,
   aiLimit: 3,
+  quotaAvailable: false,
 };
 
 async function accessToken(): Promise<string | null> {

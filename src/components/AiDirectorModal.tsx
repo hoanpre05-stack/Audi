@@ -12,6 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { ProjectData } from '../types';
+import { aiRequest } from '../utils/api';
 
 interface AiDirectorModalProps {
   isOpen: boolean;
@@ -91,20 +92,15 @@ export const AiDirectorModal: React.FC<AiDirectorModalProps> = ({
     const promptToSend = customPrompt !== undefined ? customPrompt : userPrompt;
 
     try {
-      const res = await fetch('/api/ai-design-video', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          songTitle: project.title,
-          artist: project.artist,
-          lyrics: project.lyrics,
-          userVisionPrompt: promptToSend,
-          aspectRatio: project.aspectRatio,
-        }),
+      const data = await aiRequest('/api/ai-design-video', {
+        songTitle: project.title,
+        artist: project.artist,
+        lyrics: project.lyrics,
+        userVisionPrompt: promptToSend,
+        aspectRatio: project.aspectRatio,
       });
 
-      const data = await res.json();
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         throw new Error(data.error || 'Không thể kết nối với AI Đạo Diễn.');
       }
 

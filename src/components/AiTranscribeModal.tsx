@@ -16,6 +16,7 @@ import {
   Compass,
 } from 'lucide-react';
 import { ProjectData, LyricLine } from '../types';
+import { ApiError, aiRequest } from '../utils/api';
 
 interface AiTranscribeModalProps {
   isOpen: boolean;
@@ -71,6 +72,7 @@ export const AiTranscribeModal: React.FC<AiTranscribeModalProps> = ({
 
   // Asset states
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
   const [audioBase64, setAudioBase64] = useState<string>('');
   const [audioDuration, setAudioDuration] = useState<number>(0);
   const [audioPreviewUrl, setAudioPreviewUrl] = useState<string>('');
@@ -100,6 +102,21 @@ export const AiTranscribeModal: React.FC<AiTranscribeModalProps> = ({
   const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Reset immediately so re-picking the same file still fires onChange.
+    e.target.value = '';
+
+    // Copyright gate. Uploading music the visitor does not own is the single
+    // biggest takedown risk on a tool like this, so ask once per session.
+    if (!rightsConfirmed) {
+      const accepted = window.confirm(
+        'Trước khi tải lên, xin xác nhận bạn có quyền sử dụng tệp âm thanh này ' +
+          '(bản thu của bạn, nhạc công cộng, hoặc nhạc đã mua giấy phép).\n\n' +
+          'LyricStudio AI chịu trách nhiệm gỡ bỏ nội dung vi phạm bản quyền.',
+      );
+      if (!accepted) return;
+      setRightsConfirmed(true);
+    }
 
     setError(null);
     setAudioFile(file);
@@ -159,28 +176,23 @@ export const AiTranscribeModal: React.FC<AiTranscribeModalProps> = ({
       setLoadingStep('Gemini AI đang lắng nghe và tách lời bài hát...');
       let transcribedData: any = null;
       try {
-        const transcribeRes = await fetch('/api/transcribe-lyrics', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            audioBase64,
-            mimeType: audioFile?.type || 'audio/mp3',
-            rawLyrics,
-            promptHint: userVisionPrompt,
-            audioDuration: audioDuration || 30,
-            songTitle: songTitle.trim(),
-            artist: artistName.trim(),
-          }),
+        const json = await aiRequest('/api/transcribe-lyrics', {
+          audioBase64,
+          mimeType: audioFile?.type || 'audio/mp3',
+          rawLyrics,
+          promptHint: userVisionPrompt,
+          audioDuration: audioDuration || 30,
+          songTitle: songTitle.trim(),
+          artist: artistName.trim(),
         });
-
-        const rawText = await transcribeRes.text();
-        try {
-          const json = JSON.parse(rawText);
-          if (json.success && json.data) {
-            transcribedData = json.data;
-          }
-        } catch {}
-      } catch (tErr) {
+        if (json.success && json.data) {
+          transcribedData = json.data;
+        }
+      } catch (tErr: any) {
+        // A quota refusal must reach the user. Falling back to placeholder
+        // lyrics here would look like a successful transcription and hide the
+        // reason the real thing failed.
+        if (tErr instanceof ApiError && tErr.isQuota) throw tErr;
         console.warn('Transcribe request error:', tErr);
       }
 
@@ -228,22 +240,17 @@ export const AiTranscribeModal: React.FC<AiTranscribeModalProps> = ({
       setLoadingStep('AI Đạo Diễn đang thiết kế hiệu ứng chữ & chuyển động cho bức ảnh của bạn...');
       let designedStyle: any = null;
       try {
-        const designRes = await fetch('/api/ai-design-video', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            songTitle: songTitle.trim() || transcribedData.title || audioFile?.name,
-            artist: artistName.trim() || transcribedData.artist,
-            lyrics: lyricsLines,
-            userVisionPrompt: userVisionPrompt,
-            aspectRatio: '16:9',
-          }),
+        // Styling is a bonus on top of the lyrics, so a quota refusal here is
+        // swallowed and the transcription still lands.
+        const designJson = await aiRequest('/api/ai-design-video', {
+          songTitle: songTitle.trim() || transcribedData.title || audioFile?.name,
+          artist: artistName.trim() || transcribedData.artist,
+          lyrics: lyricsLines,
+          userVisionPrompt: userVisionPrompt,
+          aspectRatio: '16:9',
         });
-        if (designRes.ok) {
-          const designJson = await designRes.json();
-          if (designJson.success && designJson.data) {
-            designedStyle = designJson.data;
-          }
+        if (designJson.success && designJson.data) {
+          designedStyle = designJson.data;
         }
       } catch (dErr) {
         console.warn('AI Design API transient error, continuing with fallback:', dErr);

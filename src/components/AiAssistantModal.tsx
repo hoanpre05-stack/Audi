@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sparkles, X, Loader2, Music, Wand2 } from 'lucide-react';
 import { LyricLine } from '../types';
+import { aiRequest } from '../utils/api';
 
 interface AiAssistantModalProps {
   isOpen: boolean;
@@ -26,19 +27,12 @@ export const AiAssistantModal: React.FC<AiAssistantModalProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/ai-lyric-assistant', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'create_lyrics',
-          topic: topic || 'Tình yêu và những chiều hoàng hôn phố vắng',
-          genre,
-          audioDuration,
-        }),
+      const json = await aiRequest('/api/ai-lyric-assistant', {
+        action: 'create_lyrics',
+        topic: topic || 'Tình yêu và những chiều hoàng hôn phố vắng',
+        genre,
+        audioDuration,
       });
-
-      if (!res.ok) throw new Error('Không thể tạo lời bài hát');
-      const json = await res.json();
       const rawLines: string[] = json.data?.lines || [];
 
       if (rawLines.length > 0) {

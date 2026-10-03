@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ProjectData, LyricLine, WordTiming } from '../types';
+import { getViewerPlan, onViewerPlanChange } from '../utils/viewer';
 
 interface VideoCanvasProps {
   project: ProjectData;
@@ -22,6 +23,8 @@ export const VideoCanvas: React.FC<VideoCanvasProps> = ({
   audioRef,
 }) => {
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+  // Bumped when the plan changes to force a re-render.
+  const [, setPlanTick] = useState(0);
   const animationFrameRef = useRef<number | null>(null);
   const particlesRef = useRef<Array<{ x: number; y: number; size: number; speedY: number; alpha: number }>>([]);
 
@@ -41,20 +44,34 @@ export const VideoCanvas: React.FC<VideoCanvasProps> = ({
   const bgImageRef = useRef<HTMLImageElement | null>(null);
   bgImageRef.current = bgImage;
 
-  // Determine canvas resolution based on aspect ratio
+  // Determine canvas resolution based on aspect ratio.
+  // Pro members get the native 1080p dimensions. Free exports are rendered at
+  // 720p (short edge 720) so the free tier cannot be used to produce
+  // full-resolution video.
   const getCanvasDimensions = () => {
-    switch (project.aspectRatio) {
-      case '9:16':
-        return { width: 1080, height: 1920 };
-      case '16:9':
-        return { width: 1920, height: 1080 };
-      case '1:1':
-        return { width: 1080, height: 1080 };
-      case '4:5':
-        return { width: 1080, height: 1350 };
-      default:
-        return { width: 1080, height: 1920 };
-    }
+    const native = (() => {
+      switch (project.aspectRatio) {
+        case '9:16':
+          return { width: 1080, height: 1920 };
+        case '16:9':
+          return { width: 1920, height: 1080 };
+        case '1:1':
+          return { width: 1080, height: 1080 };
+        case '4:5':
+          return { width: 1080, height: 1350 };
+        default:
+          return { width: 1080, height: 1920 };
+      }
+    })();
+
+    if (getViewerPlan() === 'pro') return native;
+
+    const FREE_SHORT_EDGE = 720;
+    const scale = Math.min(1, FREE_SHORT_EDGE / Math.min(native.width, native.height));
+    return {
+      width: Math.round((native.width * scale) / 2) * 2,
+      height: Math.round((native.height * scale) / 2) * 2,
+    };
   };
 
   const { width: V_WIDTH, height: V_HEIGHT } = getCanvasDimensions();
@@ -67,6 +84,10 @@ export const VideoCanvas: React.FC<VideoCanvasProps> = ({
     img.src = project.background.imageUrl;
     img.onload = () => setBgImage(img);
   }, [project.background.imageUrl]);
+
+  // Re-render when the membership changes so a freshly upgraded member
+  // immediately loses the watermark and regains the 1080p canvas.
+  useEffect(() => onViewerPlanChange(() => setPlanTick((n) => n + 1)), []);
 
   // Initialize floating particles
   useEffect(() => {
@@ -409,6 +430,20 @@ export const VideoCanvas: React.FC<VideoCanvasProps> = ({
         V_WIDTH,
         V_HEIGHT
       );
+
+      // 7. Free-tier watermark. Burned into every exported frame, so it cannot
+      // be cropped out. Pro members never reach this branch.
+      if (getViewerPlan() !== 'pro') {
+        const size = Math.max(11, Math.round(V_HEIGHT * 0.016));
+        ctx.save();
+        ctx.globalAlpha = 0.5;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = `700 ${size}px "Plus Jakarta Sans", system-ui, sans-serif`;
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('LyricStudio AI', V_WIDTH - size * 2, V_HEIGHT - size * 2);
+        ctx.restore();
+      }
 
       if (curPlaying || isExportingRef.current) {
         animationFrameRef.current = requestAnimationFrame(render);

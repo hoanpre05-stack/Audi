@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Sparkles,
@@ -11,11 +11,42 @@ import {
   ChevronDown,
   Clapperboard,
   AudioWaveform,
-  Coins,
   BookOpen,
+  Zap,
 } from 'lucide-react';
 import { AspectRatio } from '../types';
 import { SAMPLE_PROJECTS } from '../utils/sampleData';
+import { EMPTY_ME, fetchMe, type MeState } from '../utils/viewer';
+
+/** Daily AI allowance indicator with a link to upgrade. */
+const QuotaBadge: React.FC = () => {
+  const [me, setMe] = useState<MeState>(EMPTY_ME);
+
+  useEffect(() => {
+    void fetchMe().then(setMe);
+  }, []);
+
+  const exhausted = me.aiUsedToday >= me.aiLimit && me.quotaAvailable !== false;
+
+  return (
+    <Link
+      to={me.plan === 'pro' ? '/account' : '/pricing'}
+      className={`hidden sm:flex items-center gap-1.5 px-2.5 py-2 rounded-xl border text-xs font-semibold transition ${
+        exhausted
+          ? 'border-rose-500/40 bg-rose-500/10 text-rose-300'
+          : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+      }`}
+      title={
+        me.plan === 'pro'
+          ? `Gói Pro — còn hiệu lực. Hạn mức hôm nay: ${me.aiUsedToday}/${me.aiLimit}`
+          : `Lượt AI hôm nay: ${me.aiUsedToday}/${me.aiLimit}. Nâng cấp Pro để có 50 lượt và bỏ watermark.`
+      }
+    >
+      <Zap className="w-3.5 h-3.5" />
+      {me.aiUsedToday}/{me.aiLimit}
+    </Link>
+  );
+};
 
 interface NavbarProps {
   aspectRatio: AspectRatio;
@@ -140,16 +171,17 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="hidden lg:inline ml-1">Blog</span>
         </Link>
 
-        {onOpenAdSenseSettings && (
-          <button
-            onClick={onOpenAdSenseSettings}
-            className="flex items-center gap-1 px-2.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-amber-400 hover:text-amber-300 text-xs font-semibold border border-zinc-800 transition active:scale-95"
-            title="Cài đặt kiếm tiền Google AdSense"
-          >
-            <Coins className="w-4 h-4" />
-            <span className="hidden lg:inline ml-1">Kiếm Tiền</span>
-          </button>
-        )}
+        {/* Daily AI allowance. Self-contained so App.tsx stays untouched. */}
+        <QuotaBadge />
+
+        <Link
+          to="/account"
+          className="hidden sm:flex items-center gap-1 px-2.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold border border-zinc-800 transition"
+          title="Tài khoản và gói Pro"
+        >
+          <Sparkles className="w-4 h-4 text-rose-400" />
+          <span className="hidden lg:inline ml-1">Pro</span>
+        </Link>
 
         {onOpenForcedAlignment && (
           <button

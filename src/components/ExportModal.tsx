@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ExportProgress } from '../utils/videoExporter';
 import { ProjectData } from '../types';
+import { getViewerPlan, onViewerPlanChange } from '../utils/viewer';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -33,6 +34,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   project,
 }) => {
   const [isConvertingMp4, setIsConvertingMp4] = React.useState<boolean>(false);
+  const [isPro, setIsPro] = React.useState<boolean>(() => getViewerPlan() === 'pro');
+
+  // Keep the advertised resolution honest if the membership changes while the
+  // modal is open.
+  React.useEffect(() => onViewerPlanChange((plan) => setIsPro(plan === 'pro')), []);
 
   if (!isOpen) return null;
 
@@ -106,12 +112,30 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                 <h2 className="font-bold text-base text-white">
                   Xuất Lyric Video Chuẩn MP4
                 </h2>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                  Full HD 1080p
+                <span
+                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                    isPro
+                      ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                      : 'bg-zinc-800 text-zinc-400 border-zinc-700'
+                  }`}
+                >
+                  {isPro ? 'Full HD 1080p' : 'HD 720p'}
                 </span>
               </div>
               <p className="text-xs text-zinc-400">
-                Render ngầm tự động • Tắt tiếng loa ngoài • Định dạng MP4 chuẩn
+                {isPro ? (
+                  <>
+                    Render ngầm tự động • Tắt tiếng loa ngoài • Định dạng MP4 chuẩn
+                  </>
+                ) : (
+                  <>
+                    Gói miễn phí xuất 720p kèm watermark nhỏ ở góc khung hình.{' '}
+                    <a href="/pricing" className="text-rose-400 font-semibold">
+                      Nâng cấp Pro
+                    </a>{' '}
+                    để xuất 1080p không watermark.
+                  </>
+                )}
               </p>
             </div>
           </div>
