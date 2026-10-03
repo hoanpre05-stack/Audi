@@ -14,7 +14,6 @@ import { AiDirectorModal } from './components/AiDirectorModal';
 import { ForcedAlignmentModal } from './components/ForcedAlignmentModal';
 import { AdSenseSlot } from './components/AdSenseSlot';
 import { SeoArticlesSection } from './components/SeoArticlesSection';
-import { AdSenseSettingsModal } from './components/AdSenseSettingsModal';
 import { LyricVideoExporter, ExportProgress } from './utils/videoExporter';
 import { SlidersHorizontal, ListMusic } from 'lucide-react';
 
@@ -32,7 +31,6 @@ export default function App() {
   const [isExportModalOpen, setIsExportModalOpen] = useState<boolean>(false);
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState<boolean>(false);
   const [isForcedAlignmentOpen, setIsForcedAlignmentOpen] = useState<boolean>(false);
-  const [isAdSenseOpen, setIsAdSenseOpen] = useState<boolean>(false);
   const [rightPanelTab, setRightPanelTab] = useState<'lyrics' | 'styles'>('styles');
 
   // Export state
@@ -294,7 +292,6 @@ export default function App() {
         onOpenAiModal={() => setIsAiModalOpen(true)}
         onOpenAiDirector={() => setIsAiDirectorOpen(true)}
         onOpenForcedAlignment={() => setIsForcedAlignmentOpen(true)}
-        onOpenAdSenseSettings={() => setIsAdSenseOpen(true)}
         onOpenExportModal={() => setIsExportModalOpen(true)}
         onSelectSample={handleSelectSample}
         isExporting={isExporting}
@@ -305,7 +302,7 @@ export default function App() {
         {/* Left Column: Canvas Preview Player & Bottom Playback Bar */}
         <div className="flex-1 flex flex-col min-w-0 min-h-0 gap-3">
           {/* Top Banner Ad Slot */}
-          <AdSenseSlot slotId="header-slot-123" format="horizontal" className="shrink-0" />
+          <AdSenseSlot placement="header" format="horizontal" className="shrink-0" />
 
           {/* Canvas Viewport */}
           <div className="flex-1 relative min-h-0 w-full flex items-center justify-center p-2 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 overflow-hidden shadow-inner">
@@ -411,7 +408,7 @@ export default function App() {
             </div>
 
             {/* Sidebar Ad Slot (sits beautifully at the bottom of the tools) */}
-            <AdSenseSlot slotId="sidebar-slot-456" format="horizontal" className="h-20" />
+            <AdSenseSlot placement="sidebar" format="horizontal" className="h-20" />
           </div>
         </div>
       </main>
@@ -420,12 +417,6 @@ export default function App() {
       <div className="p-4 border-t border-zinc-900 bg-zinc-950/80 w-full shrink-0">
         <SeoArticlesSection />
       </div>
-
-      {/* AdSense Settings Modal */}
-      <AdSenseSettingsModal
-        isOpen={isAdSenseOpen}
-        onClose={() => setIsAdSenseOpen(false)}
-      />
 
       {/* Forced Alignment Studio (Căn Khớp Sóng Âm) Modal */}
       <ForcedAlignmentModal
