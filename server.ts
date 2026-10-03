@@ -6,6 +6,22 @@ import os from 'os';
 import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
+import { loadSiteConfig } from './src/server/siteConfig';
+import {
+  renderAdsTxt,
+  renderRobotsTxt,
+  renderSitemap,
+  renderConfigJs,
+} from './src/server/seoFiles';
+import {
+  renderLanding,
+  renderBlogIndex,
+  renderBlogPost,
+  renderPricing,
+  renderFaq,
+  renderLegal,
+  renderNotFound,
+} from './src/server/pages';
 
 dotenv.config();
 
@@ -974,6 +990,47 @@ app.post(
   }
 );
 
+const siteCfg = loadSiteConfig();
+
+const sendHtml = (res: express.Response, html: string, status = 200) =>
+  res.status(status).type('html').send(html);
+
+// --- SEO / monetization files (must precede static serving) ---
+app.get('/ads.txt', (_req, res) => {
+  res.type('text/plain').send(renderAdsTxt(siteCfg));
+});
+
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').send(renderRobotsTxt(siteCfg));
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  res.type('application/xml').send(renderSitemap(siteCfg));
+});
+
+app.get('/config.js', (_req, res) => {
+  res
+    .set('Cache-Control', 'private, max-age=60')
+    .type('application/javascript')
+    .send(renderConfigJs(siteCfg));
+});
+
+// --- Server-rendered public content pages ---
+app.get('/', (_req, res) => sendHtml(res, renderLanding(siteCfg)));
+app.get('/blog', (_req, res) => sendHtml(res, renderBlogIndex(siteCfg)));
+app.get('/blog/:slug', (req, res) => {
+  const page = renderBlogPost(siteCfg, req.params.slug);
+  return page ? sendHtml(res, page) : sendHtml(res, renderNotFound(siteCfg), 404);
+});
+app.get('/pricing', (_req, res) => sendHtml(res, renderPricing(siteCfg)));
+app.get('/faq', (_req, res) => sendHtml(res, renderFaq(siteCfg)));
+for (const slug of ['about', 'contact', 'privacy', 'terms']) {
+  app.get(`/${slug}`, (_req, res) => {
+    const page = renderLegal(siteCfg, slug);
+    return page ? sendHtml(res, page) : sendHtml(res, renderNotFound(siteCfg), 404);
+  });
+}
+
 // Serve frontend in Dev vs Production
 async function startServer() {
   const isProd = process.env.NODE_ENV === 'production';
@@ -991,10 +1048,16 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(__dirname, 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
+    app.use(express.static(distPath, { index: false, maxAge: '1h' }));
+
+    // Only the studio and the account page need the React bundle.
+    const spaShell = (_req: express.Request, res: express.Response) =>
       res.sendFile(path.join(distPath, 'index.html'));
-    });
+
+    app.get('/studio', spaShell);
+    app.get('/account', spaShell);
+
+    app.get('*', (_req, res) => sendHtml(res, renderNotFound(siteCfg), 404));
   }
 
   app.listen(PORT, '0.0.0.0', () => {

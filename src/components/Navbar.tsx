@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import {
   Sparkles,
   Download,
@@ -11,6 +12,7 @@ import {
   Clapperboard,
   AudioWaveform,
   Coins,
+  BookOpen,
 } from 'lucide-react';
 import { AspectRatio } from '../types';
 import { SAMPLE_PROJECTS } from '../utils/sampleData';
@@ -129,6 +131,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Action buttons */}
       <div className="flex items-center gap-2 sm:gap-2.5">
+        <Link
+          to="/blog"
+          className="hidden md:flex items-center gap-1 px-2.5 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white text-xs font-semibold border border-zinc-800 transition"
+          title="Blog & hướng dẫn làm lyric video"
+        >
+          <BookOpen className="w-4 h-4" />
+          <span className="hidden lg:inline ml-1">Blog</span>
+        </Link>
+
         {onOpenAdSenseSettings && (
           <button
             onClick={onOpenAdSenseSettings}

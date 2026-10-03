@@ -3396,6 +3396,182 @@ git commit -m "feat: limit concurrent converts and document environment variable
 
 ---
 
+## Task 12: Expand blog content to AdSense-ready depth
+
+**Added after plan review.** The spec (§5, §14 slice 2) requires each existing post to reach ≥800 words so the site is not classified as thin content. An audit of `src/data/blogPosts.ts` on 2026-10-03 found all five posts at 299–433 words, and the original plan never implemented this. AdSense rejection for thin content is the most likely reason an otherwise-correct build gets denied, so this task is a hard gate before submitting the application.
+
+**Files:**
+- Modify: `src/data/blogPosts.ts`
+- Create: `scripts/audit-blog.ts` (word-count gate, reusable)
+- Test: `src/server/__tests__/blogDepth.test.ts`
+
+**Interfaces:**
+- Consumes: existing `BlogPost` shape (`slug`, `title`, `description`, `date`, `author`, `category`, `keywords`, `readingMinutes`, `heroEmoji`, `blocks: BlogBlock[]`, `faqs?: BlogFaq[]`).
+- Produces: `audit-blog.ts` printing per-post word counts and exiting non-zero when any post is under the threshold.
+
+- [ ] **Step 1: Add the failing depth test**
+
+Create `src/server/__tests__/blogDepth.test.ts`:
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { BLOG_POSTS } from '../../data/blogPosts';
+
+const MIN_WORDS = 800;
+
+const postWords = (post: (typeof BLOG_POSTS)[number]): number =>
+  [
+    post.title,
+    post.description,
+    ...post.blocks.flatMap((b) => [b.text ?? '', ...(b.items ?? [])]),
+    ...(post.faqs ?? []).flatMap((f) => [f.q, f.a]),
+  ]
+    .join(' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length;
+
+describe('blog depth', () => {
+  it.each(BLOG_POSTS.map((p) => [p.slug, p] as const))(
+    '%s reaches the minimum word count',
+    (_slug, post) => {
+      expect(postWords(post)).toBeGreaterThanOrEqual(MIN_WORDS);
+    },
+  );
+
+  it.each(BLOG_POSTS.map((p) => [p.slug, p] as const))(
+    '%s has at least four headings and two FAQ entries',
+    (_slug, post) => {
+      expect(post.blocks.filter((b) => b.type === 'heading').length).toBeGreaterThanOrEqual(4);
+      expect(post.faqs?.length ?? 0).toBeGreaterThanOrEqual(2);
+    },
+  );
+
+  it.each(BLOG_POSTS.map((p) => [p.slug, p] as const))(
+    '%s keeps readingMinutes honest',
+    (_slug, post) => {
+      // Vietnamese reads at roughly 200 words per minute.
+      const minutes = Math.ceil(postWords(post) / 200);
+      expect(post.readingMinutes).toBeGreaterThanOrEqual(minutes - 1);
+    },
+  );
+
+  it('has no empty blocks or placeholder copy', () => {
+    for (const post of BLOG_POSTS) {
+      for (const block of post.blocks) {
+        const content = block.type === 'list' ? (block.items || []).join(' ') : block.text || '';
+        expect(content.trim().length).toBeGreaterThan(0);
+        expect(content).not.toMatch(/lorem ipsum|TODO|TBD|example\.com/i);
+      }
+    }
+  });
+
+  it('keeps the AdSense-money framing out of reader-facing copy', () => {
+    // The old slugs promised "kiếm tiền bằng AdSense", which reads as thin SEO bait.
+    for (const post of BLOG_POSTS) {
+      const text = [post.title, post.description].join(' ');
+      expect(text).not.toMatch(/adsense/i);
+    }
+  });
+});
+```
+
+- [ ] **Step 2: Run it and confirm it fails**
+
+Run: `npx vitest run src/server/__tests__/blogDepth.test.ts`
+Expected: FAIL — every post is under 800 words. Report the actual counts.
+
+- [ ] **Step 3: Create the audit script**
+
+Create `scripts/audit-blog.ts`:
+
+```ts
+import { BLOG_POSTS } from '../src/data/blogPosts';
+
+const MIN_WORDS = 800;
+
+const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+
+const postWords = (post: (typeof BLOG_POSTS)[number]) =>
+  words(
+    [
+      post.title,
+      post.description,
+      ...post.blocks.flatMap((b) => [b.text ?? '', ...(b.items ?? [])]),
+      ...(post.faqs ?? []).flatMap((f) => [f.q, f.a]),
+    ].join(' '),
+  );
+
+let total = 0;
+const shallow: string[] = [];
+
+for (const post of BLOG_POSTS) {
+  const w = postWords(post);
+  total += w;
+  const headings = post.blocks.filter((b) => b.type === 'heading').length;
+  console.log(
+    `${post.slug.padEnd(42)} ${String(w).padStart(5)} words  ${headings} headings  ` +
+      `${post.faqs?.length ?? 0} faqs  reads ${Math.ceil(w / 200)} min (declared ${post.readingMinutes})`,
+  );
+  if (w < MIN_WORDS) shallow.push(`${post.slug} (${w} words)`);
+}
+
+console.log(`\nTOTAL: ${total} words across ${BLOG_POSTS.length} posts`);
+
+if (shallow.length > 0) {
+  console.error(`\n${shallow.length} post(s) under ${MIN_WORDS} words:`);
+  for (const s of shallow) console.error(`  - ${s}`);
+  process.exit(1);
+}
+console.log(`All posts meet the ${MIN_WORDS}-word minimum.`);
+```
+
+Add a script to `package.json`:
+
+```json
+"audit:blog": "tsx scripts/audit-blog.ts"
+```
+
+- [ ] **Step 4: Rewrite each post to real depth**
+
+Rewrite the `blocks` and `faqs` of all five existing posts in `src/data/blogPosts.ts`. Keep each `slug`, `date`, `author`, `category`, and `heroEmoji` unchanged so existing URLs keep working.
+
+Hard requirements per post:
+
+- **800+ words** counted by `audit:blog`, counting title, description, block text, list items and FAQ answers.
+- **At least 4 `heading` blocks** that read like a real tutorial outline, not keyword lists.
+- **At least 2 `faqs`** that answer real questions a creator would search.
+- Real, specific, actionable Vietnamese prose. Concrete numbers, settings, and steps — not restatements of the heading.
+- No repetition of the same sentence across posts.
+- Set `readingMinutes` to `ceil(words / 200)` so the displayed read time is honest.
+
+Per-post outline to follow:
+
+1. `cach-lam-lyric-video-mien-phi` — "Cách làm Lyric Video Miễn Phí Bằng AI Trong 10 Phút". Headings: chuẩn bị tệp nhạc; căn lời theo từ; chọn font và hiệu ứng; xuất đúng tỷ lệ; xử lý khi AI căn sai; mẹo kiểm tra trước khi đăng.
+2. `lyric-video-tiktok-youtube-kiem-tien` — retitle away from AdSense framing, e.g. "Lyric Video TikTok & YouTube: Quy Trình Làm Nhanh Cho Creator". Headings: chọn bài nào để làm video; quy trình 6 bước; tối ưu giữ chân người xem; đăng thời điểm nào; đo hiệu quả; mở rộng kênh.
+3. `can-khop-song-am-cho-lyric-video` — "Căn Khớp Sóng Âm (Forced Alignment): Bí Quyết Chữ Chạy Đúng Nhịp". Headings: vì sao chia đều theo giây bị lệch; AI nghe được gì; quy trình căn chuẩn; sửa khi lời bị trễ; xử lý đoạn dạo đầu và đoạn nghỉ.
+4. `toi-uu-video-9-16-cho-shorts-tiktok` — "Tối Ưu Video 9:16 Cho TikTok & YouTube Shorts: Kích Thước, Font, An Toàn". Headings: vùng an toàn của từng nền tảng; kích thước và tỷ lệ; cỡ chữ theo thiết bị; giữ chữ không bị che bởi caption; kiểm tra trước khi đăng.
+5. `ban-quyen-nhac-khi-lam-video` — "Bản Quyền Nhạc Khi Làm Video Lyric: Những Điều Cần Biết". Headings: ba loại nguồn nhạc và rủi ro; nhạc công cộng; bản thu âm của bạn; đăng ký bảo hộ; khi nào nên dùng nhạc đã mua; xử lý khi nhận thông báo.
+
+For `lyric-video-tiktok-youtube-kiem-tien`, the title, description and slug must stop promising AdSense income. Keep the slug unchanged so the URL does not 404; only the visible title, description and body change.
+
+- [ ] **Step 5: Verify**
+
+Run: `npx vitest run` → all tests pass, including the new depth tests.
+Run: `npx tsx scripts/audit-blog.ts` → exits 0 and prints per-post counts of 800+ words.
+Run: `npx tsc --noEmit` → clean.
+
+Re-run `npx vitest run src/server/__tests__/pages.test.ts` specifically: the pages tests assert ≥300 characters of text per page, and longer posts must not break the "exactly one h1" rule.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/data/blogPosts.ts scripts/audit-blog.ts src/server/__tests__/blogDepth.test.ts package.json
+git commit -m "content: expand blog posts to AdSense-ready depth"
+```
+
+---
+
 ## Deployment Checklist (reference, not a task)
 
 1. Create the Supabase project; run the three migrations in order.

@@ -11,6 +11,7 @@
     "start": "cross-env NODE_ENV=production node server.js",
     "test": "vitest run",
     "check:seo": "tsx scripts/check-seo.ts",
+    "audit:blog": "tsx scripts/audit-blog.ts",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('server.js',{force:true})\"",
     "lint": "tsc --noEmit"
   },
