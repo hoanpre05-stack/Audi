@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Sparkles, HelpCircle } from 'lucide-react';
 import { getAppConfig, isAdSenseConfigured, refreshAppConfig } from '../utils/appConfig';
 import { canUseAdvertising, onConsentChange } from '../utils/consent';
+import { getViewerPlan, onViewerPlanChange } from '../utils/viewer';
 
 export type AdPlacement = 'header' | 'sidebar' | 'infeed';
 
@@ -60,6 +61,7 @@ export const AdSenseSlot: React.FC<AdSenseSlotProps> = ({
 
   useEffect(() => {
     const offConsent = onConsentChange(rerender);
+    const offPlan = onViewerPlanChange(rerender);
     const onConfigChange = () => {
       refreshAppConfig();
       rerender();
@@ -67,6 +69,7 @@ export const AdSenseSlot: React.FC<AdSenseSlotProps> = ({
     window.addEventListener('app-config-change', onConfigChange);
     return () => {
       offConsent();
+      offPlan();
       window.removeEventListener('app-config-change', onConfigChange);
     };
   }, [rerender]);
@@ -75,7 +78,10 @@ export const AdSenseSlot: React.FC<AdSenseSlotProps> = ({
   const resolvedSlot = resolveSlotId(placement, slotId);
   const configured = isAdSenseConfigured();
   const consented = canUseAdvertising(config.consentRequired);
-  const shouldServeAd = configured && consented && Boolean(resolvedSlot);
+  // Pro members never see ads. The plan cache defaults to 'free', so ads show
+  // unless the server has positively confirmed a Pro membership.
+  const isPro = getViewerPlan() === 'pro';
+  const shouldServeAd = configured && consented && !isPro && Boolean(resolvedSlot);
 
   useEffect(() => {
     if (!shouldServeAd) {
@@ -133,10 +139,12 @@ export const AdSenseSlot: React.FC<AdSenseSlotProps> = ({
     );
   }
 
+  // Paying members get an ad-free experience everywhere.
+  if (isPro) return null;
+
   // Configured but waiting for cookie consent -> render nothing.
   if (configured && !consented) return null;
 
-  // Not configured yet -> show an educational placeholder so the layout stays stable.
   const sizeClasses = {
     auto: 'h-24 w-full',
     horizontal: 'h-20 sm:h-24 w-full',
@@ -144,7 +152,10 @@ export const AdSenseSlot: React.FC<AdSenseSlotProps> = ({
     vertical: 'h-[600px] w-[300px]',
   };
 
-  return (
+  // Development only. An ad placeholder left visible in production reads as an
+  // unfinished site to the AdSense reviewer, so production renders nothing.
+  if (!import.meta.env.PROD) {
+    return (
     <div
       className={`relative flex flex-col items-center justify-center rounded-xl bg-zinc-900/60 border border-zinc-800/80 p-3 overflow-hidden text-center group transition hover:border-zinc-700/60 ${
         sizeClasses[format]
@@ -172,5 +183,8 @@ export const AdSenseSlot: React.FC<AdSenseSlotProps> = ({
         <HelpCircle className="w-3.5 h-3.5" />
       </div>
     </div>
-  );
+    );
+  }
+
+  return null;
 };
