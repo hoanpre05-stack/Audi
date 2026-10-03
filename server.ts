@@ -7,6 +7,7 @@ import { spawn } from 'child_process';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 import { consumeAiCredit } from './src/server/guard';
+import { createLimiter } from './src/server/concurrency';
 import { mountApiRoutes } from './src/server/routes/api';
 import { mountPayosRoutes } from './src/server/routes/payosApi';
 import { loadSiteConfig } from './src/server/siteConfig';
@@ -929,33 +930,14 @@ Return ONLY valid JSON matching this schema:
 });
 
 // API: High-speed conversion to MP4 (H.264 + AAC + faststart) using system FFmpeg
-/**
- * FFmpeg conversion is CPU-bound, so unlimited concurrency is the easiest way to
- * make the whole container unresponsive. Cap in-flight conversions per IP and
- * let extra callers retry instead.
- */
-const inFlightConverts = new Map<string, number>();
-const MAX_CONVERT_PER_IP = 2;
-
-const acquireConvertSlot = (key: string): boolean => {
-  const current = inFlightConverts.get(key) ?? 0;
-  if (current >= MAX_CONVERT_PER_IP) return false;
-  inFlightConverts.set(key, current + 1);
-  return true;
-};
-
-const releaseConvertSlot = (key: string): void => {
-  const current = inFlightConverts.get(key) ?? 1;
-  if (current <= 1) inFlightConverts.delete(key);
-  else inFlightConverts.set(key, current - 1);
-};
+const convertLimiter = createLimiter(2);
 
 app.post(
   '/api/convert-to-mp4',
   express.raw({ type: '*/*', limit: '300mb' }),
   async (req, res) => {
     const convertKey = req.ip || req.socket.remoteAddress || 'unknown';
-    if (!acquireConvertSlot(convertKey)) {
+    if (!convertLimiter.acquire(convertKey)) {
       return res.status(429).json({
         code: 'CONVERT_BUSY',
         message: 'Máy chủ đang bận xử lý các video khác. Vui lòng thử lại sau giây lát.',
@@ -1031,7 +1013,7 @@ app.post(
       // temp files behind until the container restarts.
       fs.promises.unlink(inputPath).catch(() => {});
       fs.promises.unlink(outputPath).catch(() => {});
-      releaseConvertSlot(convertKey);
+      convertLimiter.release(convertKey);
     }
   }
 );
