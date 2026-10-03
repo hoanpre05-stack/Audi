@@ -46,3 +46,17 @@
 .text-gold-glow {
   text-shadow: 0 0 12px rgba(245, 158, 11, 0.9), 0 0 25px rgba(251, 191, 36, 0.6);
 }
+
+/* Server-rendered page components (see src/server/pages.ts).
+   These class names are written inside template strings in src/server/**,
+   which Tailwind scans via the @source directive at the top of this file. */
+@layer components {
+  .nav { @apply flex flex-wrap gap-4 px-4 py-3 border-b border-zinc-800 text-sm; }
+  .nav a { @apply text-zinc-300 hover:text-rose-400; }
+  .site-footer { @apply border-t border-zinc-800 px-4 py-8 text-xs text-zinc-500 space-y-1; }
+  .site-footer a { @apply text-zinc-300 hover:text-rose-400; }
+  .cta { @apply inline-flex items-center rounded-xl bg-gradient-to-r from-rose-500 to-pink-600 px-5 py-2.5 text-sm font-bold text-white; }
+  .plan-card { @apply rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 text-sm text-zinc-300; }
+  .plan-card h2, .plan-card h3 { @apply text-lg font-bold text-white mb-2; }
+  .adsense-container { @apply overflow-hidden flex justify-center; }
+}
