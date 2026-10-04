@@ -1,4 +1,4 @@
-﻿import { escapeHtml, html, raw, renderShell } from './html';
+import { escapeHtml, html, raw, renderShell } from './html';
 import type { SiteConfig } from './siteConfig';
 import { BLOG_POSTS, type BlogPost } from '../data/blogPosts';
 import { FAQS, faqJsonLd } from '../data/faq';
@@ -13,22 +13,24 @@ const proseClass = 'space-y-4 text-sm sm:text-[15px] text-zinc-300 leading-7';
 /** Returns one fragment per block. `html` joins arrays raw, so these render as markup. */
 function articleBlocks(post: BlogPost, cfg: SiteConfig): string[] {
   let headingCount = 0;
-  return post.blocks.map((block) => {
-    if (block.type === 'heading') {
-      headingCount += 1;
-      const heading = `<h2 class="text-xl font-bold text-white mt-8">${escapeHtml(block.text)}</h2>`;
-      // AdSense favours an in-article unit roughly a third of the way down.
-      // Placing it after the third heading keeps it clear of the opening and
-      // avoids stranding it in a short article.
-      if (headingCount === 3) return [heading, adUnit(cfg, 'infeed')];
-      return heading;
-    }
-    if (block.type === 'list') {
-      const items = (block.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
-      return `<ul class="list-disc pl-5 space-y-2">${items}</ul>`;
-    }
-    return `<p>${escapeHtml(block.text)}</p>`;
-  }).flat();
+  return post.blocks
+    .map((block) => {
+      if (block.type === 'heading') {
+        headingCount += 1;
+        const heading = `<h2 class="text-xl font-bold text-white mt-8">${escapeHtml(block.text)}</h2>`;
+        // AdSense favours an in-article unit roughly a third of the way down.
+        // Placing it after the third heading keeps it clear of the opening and
+        // avoids stranding it in a short article.
+        if (headingCount === 3) return [heading, adUnit(cfg, 'infeed')];
+        return heading;
+      }
+      if (block.type === 'list') {
+        const items = (block.items || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+        return `<ul class="list-disc pl-5 space-y-2">${items}</ul>`;
+      }
+      return `<p>${escapeHtml(block.text)}</p>`;
+    })
+    .flat();
 }
 
 export function renderLanding(cfg: SiteConfig): string {
@@ -36,22 +38,22 @@ export function renderLanding(cfg: SiteConfig): string {
     <section class="space-y-6">
       <h1 class="text-3xl sm:text-4xl font-extrabold text-white leading-tight">${LANDING.title}</h1>
       <p class="${proseClass}">${LANDING.intro}</p>
-      <p><a class="cta" href="/studio">Má»Ÿ Studio táº¡o video</a></p>
+      <p><a class="cta" href="/studio">Mở Studio tạo video</a></p>
     </section>
 
     ${raw(adUnit(cfg, 'header'))}
 
     <section class="mt-12">
-      <h2 class="text-2xl font-bold text-white">Ba bÆ°á»›c Ä‘á»ƒ cÃ³ lyric video</h2>
+      <h2 class="text-2xl font-bold text-white">Ba bước để có lyric video</h2>
       <ol class="mt-4 space-y-4">
         ${LANDING.steps.map(
-          (s, i) => html`<li><strong>${i + 1}. ${s.title}</strong> â€” ${s.body}</li>`,
+          (s, i) => html`<li><strong>${i + 1}. ${s.title}</strong> — ${s.body}</li>`,
         )}
       </ol>
     </section>
 
     <section class="mt-12">
-      <h2 class="text-2xl font-bold text-white">TÃ­nh nÄƒng ná»•i báº­t</h2>
+      <h2 class="text-2xl font-bold text-white">Tính năng nổi bật</h2>
       <ul class="mt-4 list-disc pl-5 space-y-2">
         ${LANDING.features.map((f) => html`<li>${f}</li>`)}
       </ul>
@@ -59,20 +61,20 @@ export function renderLanding(cfg: SiteConfig): string {
 
     <section class="mt-12 grid gap-4 sm:grid-cols-2">
       <div class="plan-card">
-        <h3>GÃ³i miá»…n phÃ­</h3>
-        <p>3 lÆ°á»£t AI má»—i ngÃ y, xuáº¥t 720p cÃ³ watermark, cÃ³ quáº£ng cÃ¡o.</p>
+        <h3>Gói miễn phí</h3>
+        <p>3 lượt AI mỗi ngày, xuất 720p có watermark, có quảng cáo.</p>
       </div>
       <div class="plan-card">
-        <h3>GÃ³i Pro</h3>
-        <p>50 lÆ°á»£t AI má»—i ngÃ y, xuáº¥t 1080p khÃ´ng watermark, khÃ´ng quáº£ng cÃ¡o.</p>
+        <h3>Gói Pro</h3>
+        <p>50 lượt AI mỗi ngày, xuất 1080p không watermark, không quảng cáo.</p>
       </div>
     </section>
-    <p><a href="/pricing">Xem báº£ng giÃ¡ Ä‘áº§y Ä‘á»§</a></p>
+    <p><a href="/pricing">Xem bảng giá đầy đủ</a></p>
 
     ${raw(adUnit(cfg, 'infeed'))}
 
     <section class="mt-12">
-      <h2 class="text-2xl font-bold text-white">CÃ¢u há»i thÆ°á»ng gáº·p</h2>
+      <h2 class="text-2xl font-bold text-white">Câu hỏi thường gặp</h2>
       ${FAQS.map(
         (f) => html`
           <article class="mt-4">
@@ -84,11 +86,11 @@ export function renderLanding(cfg: SiteConfig): string {
     </section>
 
     <section class="mt-12">
-      <h2 class="text-2xl font-bold text-white">HÆ°á»›ng dáº«n chi tiáº¿t</h2>
+      <h2 class="text-2xl font-bold text-white">Hướng dẫn chi tiết</h2>
       <p class="${proseClass}">
-        Äá»c cÃ¡c bÃ i hÆ°á»›ng dáº«n trong
-        <a href="/blog">blog cá»§a LyricStudio AI</a> Ä‘á»ƒ biáº¿t cÃ¡ch chá»n font chá»¯, cÄƒn má»‘c thá»i gian
-        vÃ  xuáº¥t video Ä‘Ãºng tá»· lá»‡ cho tá»«ng ná»n táº£ng.
+        Đọc các bài hướng dẫn trong
+        <a href="/blog">blog của LyricStudio AI</a> để biết cách chọn font chữ, căn mốc thời gian
+        và xuất video đúng tỷ lệ cho từng nền tảng.
       </p>
     </section>
   `;
@@ -113,10 +115,10 @@ export function renderLanding(cfg: SiteConfig): string {
 
 export function renderBlogIndex(cfg: SiteConfig): string {
   const body = html`
-    <h1 class="text-3xl font-extrabold text-white">Blog hÆ°á»›ng dáº«n lÃ m lyric video</h1>
+    <h1 class="text-3xl font-extrabold text-white">Blog hướng dẫn làm lyric video</h1>
     <p class="${proseClass}">
-      CÃ¡c bÃ i hÆ°á»›ng dáº«n chi tiáº¿t vá» cÃ¡ch cÄƒn lá»i hÃ¡t theo tá»«, chá»n font chá»¯ hiá»‡u á»©ng, xuáº¥t video 9:16
-      cho TikTok vÃ  xá»­ lÃ½ báº£n quyá»n khi lÃ m lyric video.
+      Các bài hướng dẫn chi tiết về cách căn lời hát theo từ, chọn font chữ hiệu ứng, xuất video 9:16
+      cho TikTok và xử lý bản quyền khi làm lyric video.
     </p>
     <ul class="mt-8 space-y-6">
       ${BLOG_POSTS.map(
@@ -127,18 +129,19 @@ export function renderBlogIndex(cfg: SiteConfig): string {
                 <a href="/blog/${post.slug}">${post.title}</a>
               </h2>
               <p class="mt-1 ${proseClass}">${post.description}</p>
-              <p class="mt-1 text-xs text-zinc-500">${post.date} Â· ${post.readingMinutes} phÃºt Ä‘á»c</p>
+              <p class="mt-1 text-xs text-zinc-500">${post.date} · ${post.readingMinutes} phút đọc</p>
             </article>
           </li>
         `,
       )}
     </ul>
+
     ${raw(adUnit(cfg, 'infeed'))}
   `;
   return renderShell({
-    title: 'Blog hÆ°á»›ng dáº«n lÃ m lyric video | LyricStudio AI',
+    title: 'Blog hướng dẫn làm lyric video | LyricStudio AI',
     description:
-      'HÆ°á»›ng dáº«n lÃ m lyric video báº±ng AI: cÄƒn lá»i theo tá»«, chá»n kinetic typography, xuáº¥t video 9:16 vÃ  xá»­ lÃ½ báº£n quyá»n.',
+      'Hướng dẫn làm lyric video bằng AI: căn lời theo từ, chọn kinetic typography, xuất video 9:16 và xử lý bản quyền.',
     canonical: canon(cfg, '/blog'),
     body,
   });
@@ -151,17 +154,17 @@ export function renderBlogPost(cfg: SiteConfig, slug: string): string | null {
   const faqLd = post.faqs?.length ? [faqJsonLd(post.faqs)] : [];
   const body = html`
     <article>
-      <p><a href="/blog">â† Vá» blog</a></p>
+      <p><a href="/blog">← Về blog</a></p>
       <h1 class="mt-3 text-3xl font-extrabold text-white leading-tight">${post.title}</h1>
       <p class="mt-2 ${proseClass}">${post.description}</p>
-      <p class="mt-1 text-xs text-zinc-500">${post.author} Â· ${post.date} Â· ${post.readingMinutes} phÃºt Ä‘á»c</p>
+      <p class="mt-1 text-xs text-zinc-500">${post.author} · ${post.date} · ${post.readingMinutes} phút đọc</p>
       <div class="mt-8 ${proseClass}">${articleBlocks(post, cfg)}</div>
     </article>
 
     ${post.faqs?.length
       ? html`
           <section class="mt-12">
-            <h2 class="text-2xl font-bold text-white">CÃ¢u há»i thÆ°á»ng gáº·p</h2>
+            <h2 class="text-2xl font-bold text-white">Câu hỏi thường gặp</h2>
             ${post.faqs.map(
               (f) => html`
                 <article class="mt-4">
@@ -175,7 +178,7 @@ export function renderBlogPost(cfg: SiteConfig, slug: string): string | null {
       : ''}
 
     <section class="mt-12">
-      <h2 class="text-2xl font-bold text-white">BÃ i liÃªn quan</h2>
+      <h2 class="text-2xl font-bold text-white">Bài liên quan</h2>
       <ul class="mt-4 space-y-2">
         ${related.map((p) => html`<li><a href="/blog/${p.slug}">${p.title}</a></li>`)}
       </ul>
@@ -183,7 +186,7 @@ export function renderBlogPost(cfg: SiteConfig, slug: string): string | null {
 
     ${raw(adUnit(cfg, 'footer'))}
 
-    <p class="mt-10"><a class="cta" href="/studio">Má»Ÿ Studio táº¡o video miá»…n phÃ­</a></p>
+    <p class="mt-10"><a class="cta" href="/studio">Mở Studio tạo video miễn phí</a></p>
   `;
   return renderShell({
     title: `${post.title} | LyricStudio AI`,
@@ -209,55 +212,55 @@ export function renderBlogPost(cfg: SiteConfig, slug: string): string | null {
 
 export function renderPricing(cfg: SiteConfig): string {
   const body = html`
-    <h1 class="text-3xl font-extrabold text-white">Báº£ng giÃ¡ LyricStudio AI</h1>
+    <h1 class="text-3xl font-extrabold text-white">Bảng giá LyricStudio AI</h1>
     <p class="${proseClass}">
-      GÃ³i miá»…n phÃ­ dÃ¹ng Ä‘á»ƒ thá»­ cÃ´ng cá»¥. GÃ³i Pro dÃ nh cho ngÆ°á»i lÃ m video thÆ°á»ng xuyÃªn cáº§n xuáº¥t
-      khÃ´ng watermark, khÃ´ng quáº£ng cÃ¡o vÃ  háº¡n má»©c AI cao hÆ¡n. Thanh toÃ¡n qua PayOS, má»—i láº§n thanh
-      toÃ¡n cá»™ng thÃªm thá»i gian sá»­ dá»¥ng.
+      Gói miễn phí dùng để thử công cụ. Gói Pro dành cho người làm video thường xuyên cần xuất
+      không watermark, không quảng cáo và hạn mức AI cao hơn. Thanh toán qua PayOS, mỗi lần thanh
+      toán cộng thêm thời gian sử dụng.
     </p>
     <div class="mt-8 grid gap-6 sm:grid-cols-2">
       <section class="plan-card">
-        <h2>GÃ³i miá»…n phÃ­</h2>
-        <p class="text-2xl font-extrabold text-white">0 Ä‘</p>
+        <h2>Gói miễn phí</h2>
+        <p class="text-2xl font-extrabold text-white">0 đ</p>
         <ul class="mt-4 list-disc pl-5 space-y-2">
-          <li>3 lÆ°á»£t xá»­ lÃ½ AI má»—i ngÃ y</li>
-          <li>Xuáº¥t video 720p cÃ³ watermark</li>
-          <li>CÃ³ quáº£ng cÃ¡o Ä‘á»ƒ duy trÃ¬ dá»‹ch vá»¥</li>
-          <li>DÃ¹ng ngay, khÃ´ng cáº§n Ä‘Äƒng nháº­p</li>
+          <li>3 lượt xử lý AI mỗi ngày</li>
+          <li>Xuất video 720p có watermark</li>
+          <li>Có quảng cáo để duy trì dịch vụ</li>
+          <li>Dùng ngay, không cần đăng nhập</li>
         </ul>
       </section>
       <section class="plan-card">
-        <h2>GÃ³i Pro thÃ¡ng</h2>
-        <p class="text-2xl font-extrabold text-white">79.000 Ä‘ / thÃ¡ng</p>
+        <h2>Gói Pro tháng</h2>
+        <p class="text-2xl font-extrabold text-white">79.000 đ / tháng</p>
         <ul class="mt-4 list-disc pl-5 space-y-2">
-          <li>50 lÆ°á»£t xá»­ lÃ½ AI má»—i ngÃ y</li>
-          <li>Xuáº¥t video 1080p khÃ´ng watermark</li>
-          <li>KhÃ´ng quáº£ng cÃ¡o</li>
-          <li>Cá»™ng thÃªm 30 ngÃ y má»—i láº§n thanh toÃ¡n</li>
+          <li>50 lượt xử lý AI mỗi ngày</li>
+          <li>Xuất video 1080p không watermark</li>
+          <li>Không quảng cáo</li>
+          <li>Cộng thêm 30 ngày mỗi lần thanh toán</li>
         </ul>
       </section>
       <section class="plan-card">
-        <h2>GÃ³i Pro nÄƒm</h2>
-        <p class="text-2xl font-extrabold text-white">790.000 Ä‘ / nÄƒm</p>
+        <h2>Gói Pro năm</h2>
+        <p class="text-2xl font-extrabold text-white">790.000 đ / năm</p>
         <ul class="mt-4 list-disc pl-5 space-y-2">
-          <li>Äáº§y Ä‘á»§ tÃ­nh nÄƒng gÃ³i Pro thÃ¡ng</li>
-          <li>Cá»™ng thÃªm 365 ngÃ y má»—i láº§n thanh toÃ¡n</li>
-          <li>Tiáº¿t kiá»‡m so vá»›i tráº£ theo thÃ¡ng</li>
+          <li>Đầy đủ tính năng gói Pro tháng</li>
+          <li>Cộng thêm 365 ngày mỗi lần thanh toán</li>
+          <li>Tiết kiệm so với trả theo tháng</li>
         </ul>
       </section>
     </div>
     <p class="mt-8">
-      <a class="cta" href="/account">ÄÄƒng nháº­p Ä‘á»ƒ nÃ¢ng cáº¥p Pro</a>
+      <a class="cta" href="/account">Đăng nhập để nâng cấp Pro</a>
     </p>
     <p class="mt-4 ${proseClass}">
-      GÃ³i Pro khÃ´ng tá»± Ä‘á»™ng gia háº¡n. Khi háº¿t thá»i háº¡n, tÃ i khoáº£n trá»Ÿ vá» gÃ³i miá»…n phÃ­ vÃ  quáº£ng cÃ¡o
-      hiá»ƒn thá»‹ trá»Ÿ láº¡i.
+      Gói Pro không tự động gia hạn. Khi hết thời hạn, tài khoản trở về gói miễn phí và quảng cáo
+      hiển thị trở lại.
     </p>
   `;
   return renderShell({
-    title: 'Báº£ng giÃ¡ | LyricStudio AI',
+    title: 'Bảng giá | LyricStudio AI',
     description:
-      'GÃ³i miá»…n phÃ­ 3 lÆ°á»£t AI má»—i ngÃ y. GÃ³i Pro 79.000Ä‘ má»—i thÃ¡ng hoáº·c 790.000Ä‘ má»—i nÄƒm: 1080p khÃ´ng watermark, khÃ´ng quáº£ng cÃ¡o.',
+      'Gói miễn phí 3 lượt AI mỗi ngày. Gói Pro 79.000đ mỗi tháng hoặc 790.000đ mỗi năm: 1080p không watermark, không quảng cáo.',
     canonical: canon(cfg, '/pricing'),
     body,
   });
@@ -265,9 +268,9 @@ export function renderPricing(cfg: SiteConfig): string {
 
 export function renderFaq(cfg: SiteConfig): string {
   const body = html`
-    <h1 class="text-3xl font-extrabold text-white">CÃ¢u há»i thÆ°á»ng gáº·p vá» LyricStudio AI</h1>
+    <h1 class="text-3xl font-extrabold text-white">Câu hỏi thường gặp về LyricStudio AI</h1>
     <p class="${proseClass}">
-      Giáº£i Ä‘Ã¡p cÃ¡c cÃ¢u há»i vá» cÃ¡ch dÃ¹ng, giá»›i háº¡n gÃ³i miá»…n phÃ­, Ä‘á»‹nh dáº¡ng Ã¢m thanh vÃ  báº£n quyá»n.
+      Giải đáp các câu hỏi về cách dùng, giới hạn gói miễn phí, định dạng âm thanh và bản quyền.
     </p>
     ${FAQS.map(
       (f) => html`
@@ -278,15 +281,15 @@ export function renderFaq(cfg: SiteConfig): string {
       `,
     )}
     <p class="mt-10 ${proseClass}">
-      KhÃ´ng tÃ¬m tháº¥y cÃ¢u tráº£ lá»i? <a href="/contact">Gá»­i cÃ¢u há»i cho chÃºng tÃ´i</a>.
+      Không tìm thấy câu trả lời? <a href="/contact">Gửi câu hỏi cho chúng tôi</a>.
     </p>
 
     ${raw(adUnit(cfg, 'footer'))}
   `;
   return renderShell({
-    title: 'CÃ¢u há»i thÆ°á»ng gáº·p | LyricStudio AI',
+    title: 'Câu hỏi thường gặp | LyricStudio AI',
     description:
-      'CÃ¢u há»i thÆ°á»ng gáº·p vá» LyricStudio AI: gÃ³i miá»…n phÃ­, Ä‘á»‹nh dáº¡ng Ã¢m thanh, xuáº¥t video vÃ  báº£n quyá»n.',
+      'Câu hỏi thường gặp về LyricStudio AI: gói miễn phí, định dạng âm thanh, xuất video và bản quyền.',
     canonical: canon(cfg, '/faq'),
     body,
     jsonLd: [faqJsonLd()],
@@ -299,7 +302,7 @@ export function renderLegal(cfg: SiteConfig, slug: string): string | null {
   const resolve = (text: string): string => text.replace(/\{contactEmail\}/g, cfg.contactEmail);
   const body = html`
     <h1 class="text-3xl font-extrabold text-white">${page.title}</h1>
-    <p class="mt-1 text-xs text-zinc-500">Cáº­p nháº­t láº§n cuá»‘i: ${page.updated}</p>
+    <p class="mt-1 text-xs text-zinc-500">Cập nhật lần cuối: ${page.updated}</p>
     <p class="mt-4 ${proseClass}">${resolve(page.intro)}</p>
     ${page.sections.map(
       (section) => html`
@@ -317,7 +320,7 @@ export function renderLegal(cfg: SiteConfig, slug: string): string | null {
       `,
     )}
     <p class="mt-10 ${proseClass}">
-      LiÃªn há»‡: <a href="mailto:${cfg.contactEmail}">${cfg.contactEmail}</a>
+      Liên hệ: <a href="mailto:${cfg.contactEmail}">${cfg.contactEmail}</a>
     </p>
   `;
   return renderShell({
@@ -330,17 +333,17 @@ export function renderLegal(cfg: SiteConfig, slug: string): string | null {
 
 export function renderNotFound(cfg: SiteConfig): string {
   const body = html`
-    <h1 class="text-3xl font-extrabold text-white">KhÃ´ng tÃ¬m tháº¥y trang</h1>
+    <h1 class="text-3xl font-extrabold text-white">Không tìm thấy trang</h1>
     <p class="${proseClass}">
-      ÄÆ°á»ng dáº«n báº¡n má»Ÿ khÃ´ng tá»“n táº¡i hoáº·c Ä‘Ã£ Ä‘Æ°á»£c chuyá»ƒn Ä‘i. Báº¡n cÃ³ thá»ƒ quay láº¡i trang chá»§ Ä‘á»ƒ táº¡o
-      lyric video, hoáº·c Ä‘á»c cÃ¡c bÃ i hÆ°á»›ng dáº«n trong blog.
+      Đường dẫn bạn mở không tồn tại hoặc đã được chuyển đi. Bạn có thể quay lại trang chủ để tạo
+      lyric video, hoặc đọc các bài hướng dẫn trong blog.
     </p>
-    <p><a class="cta" href="/studio">Má»Ÿ Studio</a></p>
-    <p class="mt-2"><a href="/blog">Äá»c blog hÆ°á»›ng dáº«n</a></p>
+    <p><a class="cta" href="/studio">Mở Studio</a></p>
+    <p class="mt-2"><a href="/blog">Đọc blog hướng dẫn</a></p>
   `;
   return renderShell({
-    title: 'KhÃ´ng tÃ¬m tháº¥y trang | LyricStudio AI',
-    description: 'Trang báº¡n tÃ¬m khÃ´ng tá»“n táº¡i trÃªn LyricStudio AI.',
+    title: 'Không tìm thấy trang | LyricStudio AI',
+    description: 'Trang bạn tìm không tồn tại trên LyricStudio AI.',
     canonical: canon(cfg, '/404'),
     body,
     robots: 'noindex,follow',

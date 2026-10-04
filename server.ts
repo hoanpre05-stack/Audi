@@ -1046,6 +1046,26 @@ app.get('/robots.txt', (_req, res) => {
   res.type('text/plain').send(renderRobotsTxt(siteCfg));
 });
 
+/**
+ * Deployment probe. Answers "is the running container actually the build I
+ * pushed?" from outside Railway, which is otherwise only visible in logs.
+ * `port` is the giveaway: a stale image binds 3000, a current one binds 8080.
+ */
+app.get('/api/version', (_req, res) => {
+  res.json({
+    port: PORT,
+    portSource: PORT_SOURCE,
+    nodeEnv: process.env.NODE_ENV,
+    ffmpegInstalled: (() => {
+      try {
+        return require('fs').existsSync('/usr/bin/ffmpeg');
+      } catch {
+        return null;
+      }
+    })(),
+  });
+});
+
 app.get('/sitemap.xml', (_req, res) => {
   res.type('application/xml').send(renderSitemap(siteCfg));
 });
