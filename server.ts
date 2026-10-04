@@ -33,7 +33,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = Number(process.env.PORT) || 3000;
+/**
+ * Port the server binds to.
+ *
+ * Railway routes public traffic to 8080. Falling back to 3000 here produced a
+ * silent 502: the container started fine but nothing was listening where the
+ * proxy expected, and the app was never reachable. Default to the port the
+ * container is actually routed to, and log which source supplied it so this is
+ * never a mystery again.
+ */
+const PORT = Number(process.env.PORT) || 8080;
+const PORT_SOURCE = process.env.PORT ? 'process.env.PORT' : 'default 8080';
 
 app.use(express.json({ limit: '60mb' }));
 app.use(express.urlencoded({ extended: true, limit: '60mb' }));
@@ -1093,7 +1103,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`LyricStudio server running on http://0.0.0.0:${PORT}`);
+    console.log(`LyricStudio server running on http://0.0.0.0:${PORT} (port from ${PORT_SOURCE})`);
   });
 }
 

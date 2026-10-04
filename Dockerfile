@@ -22,6 +22,8 @@ RUN npm run build
 FROM node:22-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# Railway routes public traffic to 8080. Set explicitly so the app cannot fall
+# back to a different port if the platform does not inject PORT.
 ENV PORT=8080
 
 # FFmpeg is required for the /api/convert-to-mp4 endpoint
