@@ -12,6 +12,7 @@
     "test": "vitest run",
     "check:seo": "tsx scripts/check-seo.ts",
     "audit:blog": "tsx scripts/audit-blog.ts",
+    "reset:test-usage": "tsx scripts/reset-test-usage.ts",
     "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true});require('fs').rmSync('server.js',{force:true})\"",
     "lint": "tsc --noEmit"
   },
