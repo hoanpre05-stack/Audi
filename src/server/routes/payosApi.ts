@@ -9,7 +9,17 @@ import {
   setProfilePro,
 } from '../db';
 import { requireIdentity } from '../identity';
-import { PLANS, extendProUntil, makeOrderCode, verifyChecksum, type PlanKind } from '../payos';
+import {
+  CREATE_PAYMENT_PATH,
+  GET_PAYMENT_PATH,
+  PAYOS_API_BASE,
+  PLANS,
+  extendProUntil,
+  makeOrderCode,
+  signPaymentRequest,
+  verifyChecksum,
+  type PlanKind,
+} from '../payos';
 
 const perMinute = (max: number) =>
   rateLimit({ windowMs: 60_000, limit: max, standardHeaders: true, legacyHeaders: false });
@@ -25,11 +35,17 @@ const UNAUTHORIZED = {
   },
 } as const;
 
+/**
+ * Call the payOS merchant API.
+ *
+ * payOS has no sandbox: every call here runs against production, so a bad
+ * signature or amount is rejected outright rather than silently accepted.
+ */
 async function payosRequest(path: string, payload: Record<string, unknown>): Promise<any> {
   const clientId = process.env.PAYOS_CLIENT_ID;
   const apiKey = process.env.PAYOS_API_KEY;
   if (!clientId || !apiKey) throw new Error('PayOS is not configured');
-  const base = process.env.PAYOS_API_BASE || 'https://api.payos.vn';
+  const base = (process.env.PAYOS_API_BASE || PAYOS_API_BASE).replace(/\/+$/, '');
   const res = await fetch(`${base}${path}`, {
     method: 'POST',
     headers: {
@@ -39,8 +55,13 @@ async function payosRequest(path: string, payload: Record<string, unknown>): Pro
     },
     body: JSON.stringify(payload),
   });
-  if (!res.ok) throw new Error(`PayOS responded ${res.status}`);
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) throw new Error(`PayOS responded ${res.status}: ${text.slice(0, 200)}`);
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('PayOS returned a non-JSON body');
+  }
 }
 
 /**
@@ -89,13 +110,27 @@ export function mountPayosRoutes(app: Express, cfg: SiteConfig): void {
 
     try {
       const orderCode = makeOrderCode();
-      const order = await payosRequest('/v1/orders', {
-        order_code: orderCode,
+      const cancelUrl = `${cfg.appUrl}/pricing?cancelled=1`;
+      const returnUrl = `${cfg.appUrl}/account?paid=1&orderCode=${orderCode}`;
+      const checksumKey = process.env.PAYOS_CHECKSUM_KEY || '';
+
+      const order = await payosRequest(CREATE_PAYMENT_PATH, {
+        orderCode,
         amount: product.amount,
         description: product.description,
-        cancel_url: `${cfg.appUrl}/pricing?cancelled=1`,
-        return_url: `${cfg.appUrl}/account?paid=1&orderCode=${orderCode}`,
+        cancelUrl,
+        returnUrl,
+        // Required by payOS. Omitting it means every create call is rejected.
+        signature: signPaymentRequest(
+          { orderCode, amount: product.amount, description: product.description, cancelUrl, returnUrl },
+          checksumKey,
+        ),
       });
+
+      // payOS reports business failures in the body with HTTP 200.
+      if (order?.code !== '00') {
+        throw new Error(`PayOS rejected the order: ${order?.code} ${order?.desc || ''}`);
+      }
       const checkoutUrl = order?.data?.checkoutUrl;
       if (!checkoutUrl) throw new Error('PayOS returned no checkout URL');
 
@@ -111,7 +146,10 @@ export function mountPayosRoutes(app: Express, cfg: SiteConfig): void {
       return res.json({ checkoutUrl, orderCode });
     } catch (err) {
       console.error('[/api/payos/create]', err);
-      return res.status(502).json({ code: 'PAYOS_CREATE_FAILED' });
+      return res.status(502).json({
+        code: 'PAYOS_CREATE_FAILED',
+        message: 'Không tạo được link thanh toán. Vui lòng thử lại sau.',
+      });
     }
   });
 
@@ -130,6 +168,21 @@ export function mountPayosRoutes(app: Express, cfg: SiteConfig): void {
 
     const orderCode = Number(data.orderCode);
     if (!Number.isFinite(orderCode)) return res.status(400).json({ code: 'BAD_ORDER' });
+
+    // payOS signals success with a top-level `success` flag and `code: "00"`,
+    // not only with a status string inside `data`.
+    const succeeded =
+      req.body?.success === true &&
+      (req.body?.code === '00' || String(data.status || '').toUpperCase() === 'PAID');
+
+    if (!succeeded) {
+      // Still a genuine, correctly signed notice about a failed transfer.
+      // Record nothing and acknowledge so payOS stops retrying.
+      console.warn(
+        `[payos webhook] orderCode ${orderCode} not paid (code=${req.body?.code} success=${req.body?.success})`,
+      );
+      return res.json({ ok: true, activated: false });
+    }
 
     try {
       const result = await activateOrder(orderCode, req.body);
@@ -167,9 +220,13 @@ export function mountPayosRoutes(app: Express, cfg: SiteConfig): void {
 
       if (payment.status !== 'paid') {
         try {
-          const info = await payosRequest(`/v1/orders/${orderCode}`, {});
+          // payOS only documents POST for writes; the lookup endpoint accepts
+          // POST on this gateway and answers with the same envelope.
+          const info = await payosRequest(`${GET_PAYMENT_PATH}/${orderCode}`, {});
           const status = String(info?.data?.status || '').toUpperCase();
-          if (status === 'PAID') {
+          if (info?.code !== '00') {
+            console.warn(`[/api/payos/status] lookup not ready: ${info?.code} ${info?.desc || ''}`);
+          } else if (status === 'PAID') {
             await activateOrder(orderCode, { source: 'status-poll', status });
           } else if (status === 'CANCELLED' || status === 'EXPIRED') {
             await markPaymentStatus(payment.id, status.toLowerCase());

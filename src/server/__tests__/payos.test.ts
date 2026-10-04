@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { createHash } from 'crypto';
+import { createHmac, createHash } from 'crypto';
 import {
   verifyChecksum,
+  signPaymentRequest,
   extendProUntil,
   makeOrderCode,
   PLANS,
@@ -9,34 +10,72 @@ import {
   YEAR_DAYS,
 } from '../payos';
 
-const sign = (data: Record<string, string>, key: string) =>
-  createHash('sha256')
-    .update(
-      Object.keys(data)
-        .sort()
-        .map((k) => `${k}=${data[k]}`)
-        .join('&') + key,
-    )
-    .digest('hex');
+const hmac = (payload: string, key: string) =>
+  createHmac('sha256', key).update(payload).digest('hex');
+
+describe('signPaymentRequest', () => {
+  const params = {
+    orderCode: 123,
+    amount: 79000,
+    description: 'LS Pro T',
+    cancelUrl: 'https://delyai.app/pricing?cancelled=1',
+    returnUrl: 'https://delyai.app/account?paid=1',
+  };
+
+  it('produces the HMAC-SHA256 of alphabetically sorted k=v pairs', () => {
+    const expected = hmac(
+      'amount=79000&cancelUrl=https://delyai.app/pricing?cancelled=1&description=LS Pro T&orderCode=123&returnUrl=https://delyai.app/account?paid=1',
+      'secret',
+    );
+    expect(signPaymentRequest(params, 'secret')).toBe(expected);
+  });
+
+  it('changes when any signed field changes', () => {
+    const base = signPaymentRequest(params, 'secret');
+    expect(signPaymentRequest({ ...params, amount: 1 }, 'secret')).not.toBe(base);
+    expect(signPaymentRequest({ ...params, returnUrl: 'https://evil.example' }, 'secret')).not.toBe(base);
+  });
+
+  it('changes when the key changes', () => {
+    expect(signPaymentRequest(params, 'other')).not.toBe(signPaymentRequest(params, 'secret'));
+  });
+});
 
 describe('verifyChecksum', () => {
   const data = { orderCode: '123', amount: '79000', status: 'PAID' };
+  const payload = 'amount=79000&orderCode=123&status=PAID';
 
-  it('accepts a correct checksum', () => {
-    expect(verifyChecksum(data, sign(data, 'secret'), 'secret')).toBe(true);
+  it('accepts a correct HMAC signature', () => {
+    expect(verifyChecksum(data, hmac(payload, 'secret'), 'secret')).toBe(true);
   });
 
-  it('rejects a checksum made with the wrong key', () => {
-    expect(verifyChecksum(data, sign(data, 'other'), 'secret')).toBe(false);
+  it('rejects the old wrong scheme: a bare sha256 of payload+key', () => {
+    // This is what the first implementation did. It must never verify, otherwise
+    // anyone who knew the payload shape could forge a payment.
+    const legacy = createHash('sha256').update(payload + 'secret').digest('hex');
+    expect(legacy).not.toBe(hmac(payload, 'secret'));
+    expect(verifyChecksum(data, legacy, 'secret')).toBe(false);
+  });
+
+  it('rejects a signature of an all-ones hex string', () => {
+    expect(verifyChecksum(data, 'a'.repeat(64), 'secret')).toBe(false);
+  });
+
+  it('rejects a signature made with the wrong key', () => {
+    expect(verifyChecksum(data, hmac(payload, 'other'), 'secret')).toBe(false);
   });
 
   it('rejects a tampered payload', () => {
     const tampered = { ...data, amount: '1' };
-    expect(verifyChecksum(tampered, sign(data, 'secret'), 'secret')).toBe(false);
+    expect(verifyChecksum(tampered, hmac(payload, 'secret'), 'secret')).toBe(false);
   });
 
   it('rejects everything when no key is configured', () => {
-    expect(verifyChecksum(data, 'anything', '')).toBe(false);
+    expect(verifyChecksum(data, hmac(payload, 'secret'), '')).toBe(false);
+  });
+
+  it('rejects a signature of the wrong length without throwing', () => {
+    expect(verifyChecksum(data, 'abc', 'secret')).toBe(false);
   });
 });
 
@@ -83,5 +122,10 @@ describe('PLANS', () => {
     expect(PLANS.yearly.amount).toBe(790000);
     expect(PLANS.monthly.days).toBe(MONTH_DAYS);
     expect(PLANS.yearly.days).toBe(YEAR_DAYS);
+  });
+
+  it('keeps descriptions within the 9-character payOS limit', () => {
+    expect(PLANS.monthly.description.length).toBeLessThanOrEqual(9);
+    expect(PLANS.yearly.description.length).toBeLessThanOrEqual(9);
   });
 });

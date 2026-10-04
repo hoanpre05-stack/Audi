@@ -22,6 +22,18 @@ export function html(strings: TemplateStringsArray, ...values: unknown[]): strin
   return out;
 }
 
+/**
+ * Mark an already-built HTML string as safe to interpolate.
+ *
+ * The `html` tag escapes every interpolated value, so a pre-rendered fragment
+ * passed as a plain string would appear as visible markup text. Wrapping it in
+ * `raw()` opts that fragment out of escaping. Use this ONLY for markup you
+ * built yourself; never for user input.
+ */
+export function raw(value: string): string[] {
+  return [value];
+}
+
 export interface ShellProps {
   title: string;
   description: string;

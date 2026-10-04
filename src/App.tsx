@@ -406,9 +406,6 @@ export default function App() {
                 />
               )}
             </div>
-
-            {/* Sidebar Ad Slot (sits beautifully at the bottom of the tools) */}
-            <AdSenseSlot placement="sidebar" format="horizontal" className="h-20" />
           </div>
         </div>
       </main>

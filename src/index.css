@@ -1,4 +1,4 @@
-@import "tailwindcss";
+﻿@import "tailwindcss";
 @source "../server/**/*.ts";
 
 @layer base {
@@ -59,4 +59,7 @@
   .plan-card { @apply rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 text-sm text-zinc-300; }
   .plan-card h2, .plan-card h3 { @apply text-lg font-bold text-white mb-2; }
   .adsense-container { @apply overflow-hidden flex justify-center; }
+
+  .ad-slot { @apply my-8; }
+  .ad-slot:empty { @apply hidden; }
 }

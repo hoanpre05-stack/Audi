@@ -1,28 +1,83 @@
-import { createHash } from 'crypto';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 export const MONTH_DAYS = 30;
 export const YEAR_DAYS = 365;
 
+/**
+ * payOS limits the description to 9 characters when the paying bank account is
+ * not itself linked through payOS. 8 characters keeps us safely inside it.
+ */
 export const PLANS = {
-  monthly: { amount: 79000, days: MONTH_DAYS, description: 'LS Pro 1 thang' },
-  yearly: { amount: 790000, days: YEAR_DAYS, description: 'LS Pro 1 nam' },
+  monthly: { amount: 79000, days: MONTH_DAYS, description: 'LS Pro T' },
+  yearly: { amount: 790000, days: YEAR_DAYS, description: 'LS Pro N' },
 } as const;
 
 export type PlanKind = keyof typeof PLANS;
 
+export const PAYOS_API_BASE = 'https://api-merchant.payos.vn';
+export const CREATE_PAYMENT_PATH = '/v2/payment-requests';
+export const GET_PAYMENT_PATH = '/v2/payment-requests';
+
+/**
+ * Sign the fields payOS cares about.
+ *
+ * payOS uses HMAC-SHA256 (not a bare hash) with the channel checksum key, over
+ * the fields sorted alphabetically and joined as `k=v` pairs. Getting this
+ * wrong is silent: requests are simply rejected as "signature không hợp lệ",
+ * or a webhook is ignored.
+ */
+function signSorted(entries: Array<[string, string]>, key: string): string {
+  const payload = entries
+    .filter(([, v]) => v !== undefined && v !== null)
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([k, v]) => `${k}=${v}`)
+    .join('&');
+  return createHmac('sha256', key).update(payload).digest('hex');
+}
+
+/** Signature for POST /v2/payment-requests. */
+export function signPaymentRequest(
+  params: {
+    orderCode: number;
+    amount: number;
+    description: string;
+    cancelUrl: string;
+    returnUrl: string;
+  },
+  key: string,
+): string {
+  return signSorted(
+    [
+      ['amount', String(params.amount)],
+      ['cancelUrl', params.cancelUrl],
+      ['description', params.description],
+      ['orderCode', String(params.orderCode)],
+      ['returnUrl', params.returnUrl],
+    ],
+    key,
+  );
+}
+
+/**
+ * Verify an incoming webhook signature. Same HMAC scheme over the `data`
+ * object. Returns false whenever anything is missing or mismatched, including
+ * when no checksum key is configured, so an unconfigured server never trusts a
+ * payment.
+ */
 export function verifyChecksum(
   data: Record<string, string>,
-  checksum: string,
+  signature: string,
   key: string,
 ): boolean {
-  if (!key || !checksum) return false;
-  const payload =
-    Object.keys(data)
-      .sort()
-      .map((k) => `${k}=${data[k]}`)
-      .join('&') + key;
-  const expected = createHash('sha256').update(payload).digest('hex');
-  return expected === checksum;
+  if (!key || !signature) return false;
+  const expected = signSorted(
+    Object.entries(data).map(([k, v]) => [k, String(v)] as [string, string]),
+    key,
+  );
+  const expectedBuf = Buffer.from(expected, 'utf8');
+  const actualBuf = Buffer.from(signature, 'utf8');
+  if (expectedBuf.length !== actualBuf.length) return false;
+  return timingSafeEqual(expectedBuf, actualBuf);
 }
 
 /**
